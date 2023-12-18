@@ -1,0 +1,49 @@
+---
+# 播放书：挂载XFS磁盘并设置自动启动时挂载
+- name: 挂载XFS磁盘和设置自动启动时挂载
+  hosts: stageall
+  become: true
+  vars:
+    mount_point: /data          # 要挂载的目录
+    device_name: /dev/vdb          # 要挂载的设备名称
+
+  tasks:
+    - name: 更新apt缓存
+      apt:
+        update_cache: yes
+
+    - name: 如果需要的话，安装xfsprogs包
+      apt:
+        name: xfsprogs
+        state: present
+
+    - name: 如果需要的话，创建分区
+      parted:
+        device: "{{ device_name }}"
+        number: 1
+        label: gpt
+        state: present
+
+    - name: 使用XFS格式化分区
+      filesystem:
+        fstype: xfs
+        dev: "{{ device_name }}"
+
+    - name: 创建挂载点目录
+      file:
+        path: "{{ mount_point }}"
+        state: directory
+        mode: '0755'
+
+    - name: 挂载XFS分区
+      mount:
+        path: "{{ mount_point }}"
+        src: "{{ device_name }}"
+        fstype: xfs
+        state: mounted
+
+    - name: 在/etc/fstab中添加一行以在启动时自动挂载
+      lineinfile:
+        path: /etc/fstab
+        line: "{{ device_name }} {{ mount_point }} xfs defaults,nofail,discard 0 2"
+        create: yes
